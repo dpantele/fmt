@@ -911,12 +911,15 @@ class ThousandsSep {
 };
 
 // Returns the thousands separator for the current locale.
-template <bool SUPPORTED>
-fmt::StringRef thousands_sep() { return std::localeconv()->thousands_sep; }
+template<typename Lconv, bool=(sizeof(std::lconv)>1)>
+struct Locale {
+  static fmt::StringRef thousands_sep() { return ""; }
+};
 
-// Android doesn't have lconv::thousands_sep.
-template <>
-inline fmt::StringRef thousands_sep<false>() { return ""; }
+template<typename Lconv>
+struct Locale<Lconv, true> {
+  static fmt::StringRef thousands_sep() { return static_cast<Lconv*>(std::localeconv())->thousands_sep; }
+};
 
 // Formats a decimal unsigned integer value writing into buffer.
 // thousands_sep is a functor that is called after writing each char to
@@ -2787,7 +2790,7 @@ void BasicWriter<Char>::write_int(T value, Spec spec) {
   case 'n': {
     unsigned num_digits = internal::count_digits(abs_value);
     fmt::StringRef sep =
-        internal::thousands_sep<(sizeof(lconv) >= sizeof(char*))>();
+        internal::Locale<lconv>::thousands_sep();
     unsigned size = static_cast<unsigned>(
           num_digits + sep.size() * (num_digits - 1) / 3);
     CharPtr p = prepare_int_buffer(size, spec, prefix, prefix_size) + 1;
